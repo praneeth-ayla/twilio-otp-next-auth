@@ -33,12 +33,6 @@ export default function Navbar() {
 		};
 		getDetails();
 	}, []);
-	const pathname = usePathname();
-
-	function isActive(href: string) {
-		return pathname === href ? "text-foreground" : "text-muted-foreground";
-	}
-
 	return (
 		<div className="flex  w-full flex-col">
 			<header className="sticky top-0 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6">

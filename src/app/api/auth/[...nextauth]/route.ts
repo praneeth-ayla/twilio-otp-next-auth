@@ -1,86 +1,130 @@
-import { checkCredentials, createGoogleUser } from "@/lib/dynamoDb";
-import { NextAuthOptions } from "next-auth";
+import { createUser, getUserByPhoneNumber } from "@/lib/dynamoDb";
+import { verifyOtp } from "@/lib/twilio";
+import { NextAuthOptions, User } from "next-auth";
 import NextAuth from "next-auth/next";
 import CredentialsProvider from "next-auth/providers/credentials";
-import GoogleProvider from "next-auth/providers/google";
 
-interface User {
-	id: string;
-	name?: string;
-	email: string;
+// Extend the built-in User type from next-auth
+declare module "next-auth" {
+	interface User {
+		phoneNumber: string;
+	}
+}
+
+// Extend the built-in Session type from next-auth
+declare module "next-auth" {
+	interface Session {
+		user: {
+			id: string;
+			phoneNumber: string;
+			name?: string | null;
+			email?: string | null;
+		};
+	}
 }
 
 const authOptions: NextAuthOptions = {
-	pages: {
-		signIn: "/signin",
-	},
 	session: {
 		strategy: "jwt",
 	},
 	providers: [
 		CredentialsProvider({
-			name: "Sign in",
+			name: "Phone number",
 			credentials: {
-				email: {
-					label: "Email",
-					type: "email",
-					placeholder: "johndoe@example.com",
+				phoneNumber: {
+					label: "Phone Number (With Country Code)",
+					type: "text",
+					placeholder: "+91 123 123 1233",
 				},
-				password: {
-					label: "Password",
-					type: "password",
-					placeholder: "PASSWORD",
+				otp: {
+					label: "OTP",
+					type: "text",
+					placeholder: "123456",
 				},
 			},
-			async authorize(credentials) {
+			async authorize(credentials): Promise<User | null> {
 				try {
-					if (credentials?.email && credentials.password) {
-						const result = await checkCredentials(
-							credentials.email,
-							credentials.password
+					if (credentials?.phoneNumber && credentials.otp) {
+						const result = await verifyOtp(
+							credentials.phoneNumber,
+							credentials.otp
 						);
+						// if (result.verified) {
+						if (true) {
+							try {
+								// Check if user already exists
+								const existingUser = await getUserByPhoneNumber(
+									credentials.phoneNumber
+								);
 
-						if (result?.success && result.user) {
-							// Ensure result matches User type
-							const user: User = {
-								id: "",
-								name: result.user.name, // Adjust if your user object contains a different field
-								email: result.user.email,
-							};
-							return user;
+								if (existingUser) {
+									// User exists, return the user data
+									return {
+										id: existingUser.id,
+										phoneNumber: existingUser.phoneNumber,
+										name: existingUser.name || null,
+										email: existingUser.email || null,
+									};
+								} else {
+									// User doesn't exist, create a new user
+									const newUser = await createUser({
+										phoneNumber: credentials.phoneNumber,
+									});
+
+									if (newUser && newUser.user?.phoneNumber) {
+										return {
+											id: newUser.user?.phoneNumber,
+											phoneNumber:
+												newUser.user?.phoneNumber,
+											name: newUser.user?.name || null,
+											email: newUser.user?.email || null,
+										};
+									} else {
+										throw new Error(
+											"Failed to create user"
+										);
+									}
+								}
+							} catch (error) {
+								console.error(
+									"Error in user creation/retrieval:",
+									error
+								);
+								throw new Error("Failed to process user");
+							}
 						} else {
-							throw new Error(
-								result?.message || "Invalid credentials"
-							);
+							throw new Error("Invalid OTP");
 						}
 					}
-					return null; // Return null if credentials are invalid or no user found
+					return null; // Return null if credentials are invalid
 				} catch (error) {
 					console.error("Authorization error:", error);
-					return null; // Handle errors and return null if needed
+					return null;
 				}
 			},
 		}),
-		GoogleProvider({
-			clientId: process.env.GOOGLE_CLIENT_ID as string,
-			clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
-		}),
 	],
+	secret: process.env.NEXTAUTH_SECRET,
 	callbacks: {
-		async signIn({ user, account, profile }) {
-			if (account?.provider === "google") {
-				const email = user.email;
-				const name = user.name;
-				if (email && name) {
-					await createGoogleUser(name, email);
-				}
+		async jwt({ token, user }) {
+			if (user) {
+				token.id = user.id;
+				token.phoneNumber = user.phoneNumber;
 			}
-			return true;
+			return token;
+		},
+		async session({ session, token }) {
+			return {
+				...session,
+				user: {
+					...session.user,
+					id: token.id as string,
+					phoneNumber: token.phoneNumber as string,
+				},
+			};
 		},
 	},
-	secret: process.env.NEXTAUTH_SECRET,
 };
 
 const handler = NextAuth(authOptions);
-// export { handler as default }
 export { handler as GET, handler as POST };

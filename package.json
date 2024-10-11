@@ -28,7 +28,8 @@
 		"react-dom": "^18",
 		"react-social-login-buttons": "^4.1.0",
 		"tailwind-merge": "^2.5.2",
-		"tailwindcss-animate": "^1.0.7"
+		"tailwindcss-animate": "^1.0.7",
+		"twilio": "^5.3.3"
 	},
 	"devDependencies": {
 		"@types/bcryptjs": "^2.4.6",
