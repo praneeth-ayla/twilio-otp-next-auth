@@ -13,7 +13,7 @@ export default function Page() {
 		if (status === "loading") return; // Wait for the session to be checked
 
 		if (!session) {
-			router.push("/api/auth/signin");
+			router.push("/verify");
 		} else if (!session.user?.name || !session.user?.email) {
 			router.push("/registration");
 		}

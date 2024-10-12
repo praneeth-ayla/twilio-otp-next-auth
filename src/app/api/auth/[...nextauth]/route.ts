@@ -49,8 +49,8 @@ const authOptions: NextAuthOptions = {
 							credentials.phoneNumber,
 							credentials.otp
 						);
-						// if (result.verified) {
-						if (true) {
+						if (result.verified) {
+							// if (true) {
 							try {
 								// Check if user already exists
 								const existingUser = await getUserByPhoneNumber(
